@@ -336,7 +336,7 @@ function renderSplash() {
     <div class="cta">
       <button class="btn light block" data-action="welcome-next">Get Started <span class="arr">→</span></button>
       <button class="btn clear block" data-action="import">Restore from a backup</button>
-      <input type="file" id="importFile" accept="application/json,.json" hidden>
+      <input type="file" id="importFile" accept=".json,.txt,application/json,text/plain" hidden>
     </div>
   </section>`;
 }
@@ -804,7 +804,7 @@ const SUB = {
         <button class="btn" data-action="export">Export backup</button>
         <button class="btn" data-action="import">Import backup</button>
       </div>
-      <input type="file" id="importFile" accept="application/json,.json" hidden>
+      <input type="file" id="importFile" accept=".json,.txt,application/json,text/plain" hidden>
     </section>
     <button class="btn danger block" data-action="wipe">Delete all my data</button>`;
   },
@@ -923,10 +923,21 @@ function exportData() {
   toast('Backup saved 🌸');
 }
 
+function readFileText(file) {
+  if (file.text) return file.text().catch(() => readWithReader(file));
+  return readWithReader(file);
+}
+function readWithReader(file) {
+  return new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(String(r.result)); r.onerror = () => rej(r.error); r.readAsText(file); });
+}
+
 async function importData(file) {
   if (!file) return;
   try {
-    const data = JSON.parse(await file.text());
+    const raw = await readFileText(file);
+    const start = raw.indexOf('{'), end = raw.lastIndexOf('}');
+    if (start < 0 || end < start) throw new Error('bad file');
+    const data = JSON.parse(raw.slice(start, end + 1));   // tolerate BOMs or stray text around the JSON
     if (!data || typeof data.days !== 'object') throw new Error('bad file');
     const days = {};
     for (const [k, v] of Object.entries(data.days)) if (/^\d{4}-\d{2}-\d{2}$/.test(k) && v && typeof v === 'object') days[k] = v;
@@ -937,7 +948,7 @@ async function importData(file) {
     state = { settings, days };
     ui.tab = 'home'; ui.sub = null;
     save(); render(); toast('Backup restored 🌸');
-  } catch (e) { toast('That file isn’t an ObaaSima backup'); }
+  } catch (e) { toast(`That file isn’t an ObaaSima backup${file && file.name ? ` (${file.name})` : ''}. Choose the obaasima-backup file.`); }
 }
 
 async function setPhoto(file) {
