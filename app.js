@@ -457,6 +457,7 @@ function renderHome(M) {
       </div>
     </section>
     ${quickActions(M)}
+    ${typeof nourishCard === 'function' ? nourishCard(M) : ''}
     ${P.fruit ? `<section class="card note-card"><div class="ico" style="font-size:28px;background:var(--lav-soft)">${P.fruit[1]}</div><div><b>Baby’s development</b><span>Your baby is about the size of ${P.fruit[0]}.</span></div></section>` : ''}
     ${affirmation()}
     ${todayLog(tk)}`;
@@ -474,6 +475,7 @@ function renderHome(M) {
       </div>
     </section>
     ${quickActions(M)}
+    ${typeof nourishCard === 'function' ? nourishCard(M) : ''}
     ${affirmation()}
     ${todayLog(tk)}
     <p class="disclaimer">ObaaSima estimates cycles from your logs. It isn’t a medical device or contraception.</p>`;
@@ -497,6 +499,7 @@ function renderHome(M) {
     </div>
   </section>
   ${quickActions(M)}
+  ${typeof nourishCard === 'function' ? nourishCard(M) : ''}
   <div class="section-head"><h2>Your Cycle</h2><button class="link" data-action="goto" data-tab="insights">View details →</button></div>
   <section class="card">${timeline(M)}</section>
   ${affirmation()}
