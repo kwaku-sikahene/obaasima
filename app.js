@@ -8,6 +8,8 @@
    ========================================================= */
 
 const KEY = 'obaasima-data-v1';
+// True inside the ObaaSima iPhone app (which provides a native bridge).
+const NATIVE = !!(window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.obaasima);
 const LEGACY_KEY = 'lune-data-v1';
 
 const FLOWS = [
@@ -128,6 +130,7 @@ const DEFAULTS = {
   settings: {
     name: '', photo: null, cycleLength: 28, periodLength: 5, lutealLength: 14,
     reminders: false, onboarded: false, lastNotified: null, pregnancy: { on: false, lmp: null },
+    lock: { on: false, salt: null, hash: null, bio: null, fails: 0, until: 0 },
   },
   days: {},
 };
@@ -158,6 +161,7 @@ function load() {
       const s = JSON.parse(raw);
       const settings = { ...DEFAULTS.settings, ...(s.settings || {}) };
       settings.pregnancy = { ...DEFAULTS.settings.pregnancy, ...(settings.pregnancy || {}) };
+      settings.lock = { ...DEFAULTS.settings.lock, ...(settings.lock || {}) };
       return { settings, days: s.days || {} };
     }
   } catch (e) { /* storage unavailable or corrupt: start fresh */ }
@@ -169,7 +173,9 @@ function save() {
 }
 
 let state = load();
-const ui = { tab: 'home', sub: null, month: startOfMonth(today()), edit: false, sheetDate: null, more: false, step: 0 };
+const ui = { tab: 'home', sub: null, month: startOfMonth(today()), edit: false, sheetDate: null, more: false, step: 0,
+  // App lock (see lock.js): the welcome screen shows until she unlocks or continues.
+  unlocked: false, lockMode: null, pin: '', pinTemp: null, lockMsg: '', flow: null, shake: false };
 
 function getDay(k) { return state.days[k] || {}; }
 function setDay(k, patch) {
@@ -296,8 +302,10 @@ const $ = sel => document.querySelector(sel);
 function render() {
   const view = $('#view');
   const onboarding = !state.settings.onboarded;
-  document.body.classList.toggle('bare', onboarding);
+  const locked = !onboarding && !ui.unlocked;
+  document.body.classList.toggle('bare', onboarding || locked);
   if (onboarding) { view.innerHTML = ui.step === 0 ? renderSplash() : renderOnboarding(); return; }
+  if (locked) { view.innerHTML = renderLock(); ui.shake = false; return; }
   const M = model();
   const views = { home: renderHome, calendar: renderCalendar, insights: renderInsights, profile: renderProfile };
   view.innerHTML = views[ui.tab](M);
@@ -317,13 +325,10 @@ function head(title, { back = false, right = '', center = false } = {}) {
 function renderSplash() {
   return `
   <section class="splash">
-    <svg class="rings" viewBox="0 0 400 800" preserveAspectRatio="xMidYMid slice" aria-hidden="true" fill="none" stroke="#fff">
-      <circle cx="200" cy="250" r="120"/><circle cx="200" cy="250" r="180"/><circle cx="200" cy="250" r="250"/><circle cx="200" cy="250" r="330"/>
-    </svg>
+    <div class="splash-photo" role="img" aria-label="A smiling woman in a patterned head wrap, eyes closed, face lifted to the sky"></div>
     ${LOTUS}
     <h1>ObaaSima</h1>
     <p class="tagline">Know your body.<br>Embrace your journey.</p>
-    <p class="meaning"><i>Obaa sima</i> — in Asante Twi, a mature, graceful woman. Your private companion for every season of womanhood.</p>
     <div class="cta">
       <button class="btn light block" data-action="welcome-next">Get Started <span class="arr">→</span></button>
       <button class="btn clear block" data-action="import">Restore from a backup</button>
@@ -681,7 +686,7 @@ function renderProfile(M) {
   if (ui.sub) return SUB[ui.sub](M);
   const s = state.settings;
   const item = (sub, icon, label) => `<li><button data-action="sub" data-sub="${sub}">${icon}<span>${label}</span><svg class="chev" viewBox="0 0 24 24"><path d="M9 5l7 7-7 7"/></svg></button></li>`;
-  const standalone = matchMedia('(display-mode: standalone)').matches || navigator.standalone;
+  const standalone = NATIVE || matchMedia('(display-mode: standalone)').matches || navigator.standalone;
   return `
   ${head('Profile', { right: `<button class="icon-btn" data-action="sub" data-sub="cycle" aria-label="Cycle settings">${ICON.gear}</button>` })}
   <section class="profile-top">
@@ -694,6 +699,7 @@ function renderProfile(M) {
     ${item('pregnancy', ICON.baby, 'Pregnancy Journey')}
     ${item('reminders', ICON.bell, 'Reminders')}
     ${item('cycle', ICON.sliders, 'Cycle Settings')}
+    ${item('lock', ICON.lock, 'App Lock')}
     ${item('data', ICON.shield, 'Privacy & Backup')}
     ${standalone ? '' : item('install', ICON.phone, 'Install on Your Phone')}
     ${item('about', ICON.info, 'About ObaaSima')}
@@ -785,7 +791,7 @@ const SUB = {
     </section>
     <section class="card">
       <h2>Backup</h2>
-      <p class="muted small">Save a backup file before changing phones or clearing your browser.</p>
+      <p class="muted small">${NATIVE ? 'Save a backup to Files or AirDrop it before changing phones or reinstalling.' : 'Save a backup file before changing phones or clearing your browser.'}</p>
       <div class="row" style="margin-top:12px">
         <button class="btn" data-action="export">Export backup</button>
         <button class="btn" data-action="import">Import backup</button>
@@ -893,11 +899,17 @@ function toast(msg) {
 }
 
 function exportData() {
-  const payload = { app: 'obaasima', version: 2, exported: new Date().toISOString(), settings: state.settings, days: state.days };
+  // The app lock (passcode fingerprint, Face ID key) belongs to this device and never goes into a backup.
+  const payload = { app: 'obaasima', version: 2, exported: new Date().toISOString(), settings: { ...state.settings, lock: undefined }, days: state.days };
+  const filename = `obaasima-backup-${toKey(today())}.json`;
+  if (NATIVE) { // iPhone app: hand the file to the native share sheet.
+    window.webkit.messageHandlers.obaasima.postMessage({ type: 'share-file', filename, content: JSON.stringify(payload, null, 2) });
+    return;
+  }
   const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
-  a.download = `obaasima-backup-${toKey(today())}.json`;
+  a.download = filename;
   document.body.appendChild(a); a.click(); a.remove();
   setTimeout(() => URL.revokeObjectURL(a.href), 1000);
   toast('Backup saved 🌸');
@@ -913,6 +925,7 @@ async function importData(file) {
     if (!confirm(`Replace your current data with this backup (${Object.keys(days).length} logged days)?`)) return;
     const settings = { ...DEFAULTS.settings, ...(data.settings || {}), onboarded: true };
     settings.pregnancy = { ...DEFAULTS.settings.pregnancy, ...(settings.pregnancy || {}) };
+    settings.lock = { ...DEFAULTS.settings.lock, ...(state.settings.lock || {}) };   // keep this device's lock
     state = { settings, days };
     ui.tab = 'home'; ui.sub = null;
     save(); render(); toast('Backup restored 🌸');
@@ -1033,7 +1046,7 @@ document.addEventListener('click', async e => {
     case 'wipe':
       if (confirm('Delete all your ObaaSima data from this device? This can’t be undone — export a backup first if you might want it.')) {
         try { localStorage.removeItem(KEY); localStorage.removeItem(LEGACY_KEY); } catch (err) { /* ignore */ }
-        state = structuredClone(DEFAULTS); ui.tab = 'home'; ui.sub = null; ui.step = 0; render();
+        state = structuredClone(DEFAULTS); ui.tab = 'home'; ui.sub = null; ui.step = 0; ui.unlocked = false; ui.lockMode = null; render();
       }
       break;
     case 'install':
@@ -1092,6 +1105,8 @@ document.addEventListener('submit', e => {
     }
   }
   ui.tab = 'home';
+  // Next: protect the app with a passcode (and Face ID / Touch ID if available).
+  Object.assign(ui, { unlocked: false, flow: 'setup', lockMode: 'create', pin: '', lockMsg: '' });
   save(); render(); scrollTo(0, 0);
   toast(`Akwaaba${state.settings.name ? ', ' + state.settings.name : ''} 🌸`);
 });
@@ -1112,5 +1127,6 @@ if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
   navigator.serviceWorker.register('sw.js').catch(() => {});
 }
 
-render();
-maybeRemind();
+// lock.js loads after this file; start once every script is in place.
+// (maybeRemind runs after unlocking, so nothing shows on the lock screen.)
+document.addEventListener('DOMContentLoaded', () => render());

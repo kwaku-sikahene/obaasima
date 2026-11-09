@@ -1,7 +1,7 @@
 // Offline cache for the app shell. Bump VERSION when files change.
-const VERSION = 'obaasima-v4';
-const ASSETS = ['./', 'index.html', 'styles.css', 'app.js', 'manifest.webmanifest',
-  'icons/icon.svg', 'icons/lotus.svg', 'fonts/playfair-display.woff2', 'icons/icon-180.png', 'icons/icon-192.png', 'icons/icon-512.png'];
+const VERSION = 'obaasima-v6';
+const ASSETS = ['./', 'index.html', 'styles.css', 'app.js', 'lock.js', 'manifest.webmanifest',
+  'icons/icon.svg', 'images/welcome.jpg', 'icons/lotus.svg', 'fonts/playfair-display.woff2', 'icons/icon-180.png', 'icons/icon-192.png', 'icons/icon-512.png'];
 
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(VERSION).then(c => c.addAll(ASSETS)).then(() => self.skipWaiting()));
