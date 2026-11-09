@@ -23,6 +23,8 @@ const SYMPTOMS = [
   ['Cramps', '🌀'], ['Headache', '🤕'], ['Breast tenderness', '💗'],
   ['Bloating', '🎈'], ['Mood swings', '🎭'], ['Fatigue', '😴'],
 ];
+const INTIMACY = [['none', 'None', ''], ['protected', 'Protected', '🛡️'], ['unprotected', 'Unprotected', '💞']];
+const CLOSENESS = [['Kissing', '💋'], ['Self-love', '🌹']];
 const MORE_SYMPTOMS = [
   ['Backache', '🦴'], ['Acne', '✨'], ['Nausea', '🤢'], ['Cravings', '🍫'], ['Insomnia', '🌙'],
   ['Dizziness', '💫'], ['Anxious', '😟'], ['Irritable', '😤'], ['Digestive issues', '🫧'],
@@ -178,6 +180,10 @@ function setDay(k, patch) {
   if (!d.moods || !d.moods.length) delete d.moods;
   if (!d.notes || !d.notes.trim()) delete d.notes;
   if (d.temp == null || Number.isNaN(d.temp)) delete d.temp;
+  if (!d.intimacy || d.intimacy === 'none') delete d.intimacy;
+  if (!d.closeness || !d.closeness.length) delete d.closeness;
+  if (!d.medicine || !d.medicine.trim()) delete d.medicine;
+  if (d.weight == null || Number.isNaN(d.weight)) delete d.weight;
   if (Object.keys(d).length) state.days[k] = d; else delete state.days[k];
   save();
 }
@@ -397,6 +403,10 @@ function todayLog(tk) {
   (d.symptoms || []).forEach(x => tags.push(`<span class="tag">${esc(x)}</span>`));
   (d.moods || []).forEach(x => tags.push(`<span class="tag">${esc(x)}</span>`));
   if (d.temp != null) tags.push(`<span class="tag">🌡️ ${d.temp}°</span>`);
+  if (d.intimacy) { const x = INTIMACY.find(i => i[0] === d.intimacy); tags.push(`<span class="tag">${x[2]} ${x[1]}</span>`); }
+  (d.closeness || []).forEach(x => tags.push(`<span class="tag">${(CLOSENESS.find(c => c[0] === x) || [, '💗'])[1]} ${esc(x)}</span>`));
+  if (d.medicine) tags.push(`<span class="tag">💊 ${esc(d.medicine)}</span>`);
+  if (d.weight != null) tags.push(`<span class="tag">⚖️ ${d.weight} kg</span>`);
   if (d.notes) tags.push(`<span class="tag">📝 Note</span>`);
   return `
   <button class="card note-card" data-action="log-today" style="text-align:left;width:100%;font:inherit;color:inherit">
@@ -510,7 +520,8 @@ function renderCalendar(M) {
     if (ovu) cls.push('ovu'); else if (M.fertSet.has(k)) cls.push('fertile');
     if (k === tk) cls.push('today');
     if (future) cls.push('future');
-    const hasLog = day.symptoms || day.moods || day.notes || day.feeling || day.temp != null;
+    const hasLog = day.symptoms || day.moods || day.notes || day.feeling || day.temp != null ||
+      day.intimacy || day.closeness || day.medicine || day.weight != null;
     const label = fmt(date, { weekday: 'long', day: 'numeric', month: 'long' });
     cells += `<button class="${cls.join(' ')}" data-action="day" data-date="${k}" ${ui.edit && future ? 'disabled' : ''} aria-label="${label}"><span>${dn}</span>${ovu ? '<b class="star">★</b>' : ''}${hasLog ? '<i class="dot"></i>' : ''}</button>`;
   }
@@ -811,9 +822,9 @@ function openLog(k) {
   ui.sheetDate = k;
   const dlg = $('#sheet');
   const date = fromKey(k), d = getDay(k), future = date > today(), dis = future ? 'disabled' : '';
-  const tile = ([name, em]) => {
-    const on = (d.symptoms || []).includes(name);
-    return `<button class="tile ${on ? 'on' : ''}" data-action="toggle" data-v="${esc(name)}" aria-pressed="${on}" ${dis}><span class="em">${em}</span>${esc(name)}</button>`;
+  const tile = ([name, em], field = 'symptoms') => {
+    const on = (d[field] || []).includes(name);
+    return `<button class="tile ${on ? 'on' : ''}" data-action="toggle" data-field="${field}" data-v="${esc(name)}" aria-pressed="${on}" ${dis}><span class="em">${em}</span>${esc(name)}</button>`;
   };
   const extraOn = MORE_SYMPTOMS.some(([n]) => (d.symptoms || []).includes(n));
   const showMore = ui.more || extraOn;
@@ -832,10 +843,18 @@ function openLog(k) {
     <h3>Flow</h3>
     <div class="seg">${FLOWS.map(([v, l, drops]) => `<button data-action="flow" data-v="${v}" class="${(d.flow || 'none') === v ? 'on' : ''}" aria-pressed="${(d.flow || 'none') === v}" ${dis}><span class="drops">${drops}</span>${l}</button>`).join('')}</div>
     <h3>Select symptoms <small>(optional)</small></h3>
-    <div class="tiles">${SYMPTOMS.map(tile).join('')}${showMore ? MORE_SYMPTOMS.map(tile).join('') : ''}</div>
+    <div class="tiles">${SYMPTOMS.map(s => tile(s)).join('')}${showMore ? MORE_SYMPTOMS.map(s => tile(s)).join('') : ''}</div>
     ${showMore ? '' : '<div class="more"><button class="btn sm" data-action="more">+ More</button></div>'}
-    <h3>Basal temperature <small>(optional)</small></h3>
-    <input type="number" step="0.01" inputmode="decimal" data-field="temp" value="${d.temp ?? ''}" placeholder="e.g. 36.55 °C" ${dis} aria-label="Basal body temperature">
+    <h3>Intimacy <small>🔒 private to this phone</small></h3>
+    <div class="seg three">${INTIMACY.map(([v, l, e]) => `<button data-action="intimacy" data-v="${v}" class="${(d.intimacy || 'none') === v ? 'on' : ''}" aria-pressed="${(d.intimacy || 'none') === v}" ${dis}><span class="drops">${e}</span>${l}</button>`).join('')}</div>
+    <div class="tiles" style="margin-top:10px">${CLOSENESS.map(c => tile(c, 'closeness')).join('')}</div>
+    <h3>Medicine &amp; supplements <small>(optional)</small></h3>
+    <input type="text" data-field="medicine" value="${esc(d.medicine || '')}" placeholder="e.g. Folic acid, iron, paracetamol" maxlength="80" ${dis} aria-label="Medicine and supplements">
+    <h3>Weight &amp; temperature <small>(optional)</small></h3>
+    <div class="duo-in">
+      <input type="number" step="0.1" inputmode="decimal" data-field="weight" value="${d.weight ?? ''}" placeholder="Weight (kg)" ${dis} aria-label="Weight in kilograms">
+      <input type="number" step="0.01" inputmode="decimal" data-field="temp" value="${d.temp ?? ''}" placeholder="Basal temp (°C)" ${dis} aria-label="Basal body temperature">
+    </div>
     <h3>Notes</h3>
     <textarea data-field="notes" rows="3" placeholder="Anything worth remembering…" aria-label="Notes">${esc(d.notes || '')}</textarea>
     <button class="btn primary block" style="margin-top:22px" data-action="save-entry">Save Entry</button>
@@ -981,10 +1000,15 @@ document.addEventListener('click', async e => {
       el.parentElement.querySelectorAll('button').forEach(b => { b.classList.toggle('on', b === el); b.setAttribute('aria-pressed', b === el); });
       render(); break;
     }
+    case 'intimacy': {
+      setDay(ui.sheetDate, { intimacy: el.dataset.v });
+      el.parentElement.querySelectorAll('button').forEach(b => { b.classList.toggle('on', b === el); b.setAttribute('aria-pressed', b === el); });
+      render(); break;
+    }
     case 'toggle': {
-      const v = el.dataset.v, set = new Set(getDay(ui.sheetDate).symptoms || []);
+      const f = el.dataset.field || 'symptoms', v = el.dataset.v, set = new Set(getDay(ui.sheetDate)[f] || []);
       set.has(v) ? set.delete(v) : set.add(v);
-      setDay(ui.sheetDate, { symptoms: [...set] });
+      setDay(ui.sheetDate, { [f]: [...set] });
       el.classList.toggle('on', set.has(v)); el.setAttribute('aria-pressed', set.has(v));
       render(); break;
     }
@@ -1021,7 +1045,8 @@ document.addEventListener('click', async e => {
 document.addEventListener('input', e => {
   const el = e.target;
   if (el.dataset.field && ui.sheetDate) {
-    const v = el.dataset.field === 'temp' ? (el.value === '' ? null : parseFloat(el.value)) : el.value;
+    const numeric = el.dataset.field === 'temp' || el.dataset.field === 'weight';
+    const v = numeric ? (el.value === '' ? null : parseFloat(el.value)) : el.value;
     setDay(ui.sheetDate, { [el.dataset.field]: v });
   }
 });

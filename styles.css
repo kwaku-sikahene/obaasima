@@ -353,6 +353,10 @@ dialog#sheet[open] { animation: up .28s cubic-bezier(.2, .8, .2, 1); }
 }
 .seg .drops { color: var(--rose); font-size: 10px; letter-spacing: 1px; line-height: 1; min-height: 10px; }
 .seg button.on { border-color: var(--rose); background: var(--rose-soft); color: var(--rose); }
+.seg.three { grid-template-columns: repeat(3, 1fr); }
+.seg.three .drops { font-size: 15px; letter-spacing: 0; min-height: 16px; }
+.duo-in { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+input[type=text]::placeholder, input[type=number]::placeholder { color: var(--muted); opacity: .8; }
 .seg button:disabled { opacity: .45; }
 
 .tiles { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
