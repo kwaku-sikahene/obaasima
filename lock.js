@@ -98,7 +98,7 @@ ui.bioAvail = false;
     try { ui.bioAvail = !!(window.PublicKeyCredential && await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable()); }
     catch (e) { ui.bioAvail = false; }
   }
-  if (!ui.unlocked || ui.sub === 'lock') render();
+  if (!ui.unlocked || ui.sub === 'lock' || ui.setup === 'security') render();
 })();
 
 function bioEnabled() {
@@ -176,7 +176,7 @@ function onPinComplete(pin) {
     if (L.hash && hashPin(pin, L.salt) === L.hash) {
       L.fails = 0; L.until = 0; save();
       if (ui.flow === 'change') { ui.lockMode = 'create'; ui.lockMsg = ''; return render(); }
-      if (ui.flow === 'disable') { state.settings.lock = { ...DEFAULTS.settings.lock }; save(); toast('App lock turned off'); return finishFlow(); }
+      if (ui.flow === 'disable') { state.settings.lock = { ...DEFAULTS.settings.lock, asked: true }; save(); toast('App lock turned off'); return finishFlow(); }
       return unlock();
     }
     registerFail();
@@ -199,6 +199,7 @@ function onPinComplete(pin) {
     const salt = randHex(16);
     Object.assign(L, { on: true, salt, hash: hashPin(pin, salt), fails: 0, until: 0 });
     save(); ui.pinTemp = null;
+    if (ui.flow === 'signup') return finishSecuritySetup();
     if (ui.bioAvail && !bioEnabled()) { ui.lockMode = 'bio-offer'; return render(); }
     toast(ui.flow === 'change' ? 'Passcode changed' : 'ObaaSima is now protected 🔒');
     return finishFlow();
@@ -253,12 +254,12 @@ function pinPad() {
   const key = d => `<button class="key" data-action="lock-key" data-k="${d}" ${wait ? 'disabled' : ''}>${d}</button>`;
   const bioKey = ui.lockMode === 'pin' && !ui.flow && bioEnabled()
     ? `<button class="key fn" data-action="lock-bio" aria-label="Unlock with ${BIO_LABEL}">${bioIcon()}</button>` : '<span></span>';
-  const cancelLabel = ui.flow === 'setup' && ui.lockMode === 'create' ? 'Skip for now' : 'Cancel';
+  const cancelLabel = ui.flow === 'signup' ? 'Back' : ui.flow === 'setup' && ui.lockMode === 'create' ? 'Skip for now' : 'Cancel';
   return `
   <div class="pin ${ui.shake ? 'shake' : ''}" role="group" aria-label="${titles[ui.lockMode]}">
     <p class="pin-title">${titles[ui.lockMode]}</p>
     <div class="dots" aria-label="${ui.pin.length} of ${PIN_LENGTH} digits entered">${dots}</div>
-    <p class="pin-msg" role="status">${msg}</p>
+    <p class="pin-msg ${ui.lockMsg || wait ? 'err' : ''}" role="status">${msg}</p>
     <div class="keys">
       ${[1, 2, 3, 4, 5, 6, 7, 8, 9].map(key).join('')}
       ${bioKey}${key(0)}
@@ -318,7 +319,8 @@ document.addEventListener('click', async e => {
       break;
     }
     case 'lock-cancel':
-      if (ui.flow === 'setup') { ui.flow = null; ui.lockMode = null; ui.unlocked = true; render(); }
+      if (ui.flow === 'signup') { Object.assign(ui, { flow: null, lockMode: null, pin: '', pinTemp: null, lockMsg: '' }); render(); }
+      else if (ui.flow === 'setup') { ui.flow = null; ui.lockMode = null; ui.unlocked = true; render(); }
       else if (ui.flow) finishFlow();
       else { ui.lockMode = null; ui.pin = ''; ui.lockMsg = ''; render(); }
       break;
@@ -377,3 +379,73 @@ document.addEventListener('visibilitychange', () => {
 setInterval(() => {
   if (!ui.unlocked && ui.lockMode === 'pin' && lockCfg().until > Date.now() - 1500) render();
 }, 1000);
+
+/* ---------------- Signup step 2: "Keep it private" ----------------
+   Shown once: right after signup, or on the first open for someone who
+   already has data but never chose a lock. She sets a backup passcode and
+   (optionally) Face ID / Touch ID, then goes straight in — the welcome-screen
+   lock starts from the NEXT time she opens ObaaSima. */
+function needsSecuritySetup() {
+  if (ui.setup === 'security') return true;
+  const L = lockCfg();
+  if (!L.on && !L.asked) { ui.setup = 'security'; ui.unlocked = true; return true; }
+  return false;
+}
+
+const LOCK_IC = () => ICON.lock.replace('<svg', '<svg class="bio-ic" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"');
+
+function renderSecurity() {
+  const padOpen = ui.flow === 'signup' && ['create', 'confirm'].includes(ui.lockMode);
+  const bioOn = ui.bioAvail && ui.secBio;
+  return `
+  <section class="onboard security">
+    ${ui.fromSignup ? '<p class="sec-step">Step 2 of 2</p>' : ''}
+    <div class="sec-badge">${LOCK_IC()}</div>
+    <h1>Keep it private</h1>
+    <p>${padOpen
+      ? (bioOn ? `First, a backup passcode for when ${BIO_LABEL} can’t see you.` : 'Choose a passcode only you know.')
+      : 'Your journal holds personal things. Choose how you’ll open ObaaSima — it will start asking from the next time you open the app.'}</p>
+    ${padOpen ? `<div class="card sec-pad">${pinPad()}</div>` : `
+    <section class="card sec-card">
+      ${ui.bioAvail
+        ? `<label class="switch"><span>${bioIcon()} Unlock with ${BIO_LABEL}</span><input type="checkbox" data-action="sec-bio" ${bioOn ? 'checked' : ''}></label>
+           <p class="muted small">Quick and private — ${BIO_LABEL} is checked by your device. ObaaSima never sees your face or fingerprint.</p>`
+        : `<p class="small">${BIO_LABEL} isn’t set up on this device, so you’ll use a passcode. You can add it later in Profile → App Lock.</p>`}
+      <div class="sec-row">${LOCK_IC()}<div><b>Backup passcode</b><span class="muted small">4 digits${ui.bioAvail ? ` — for when ${BIO_LABEL} can’t see you` : ''}</span></div></div>
+    </section>
+    <button class="btn primary block" data-action="sec-start">${bioOn ? `Set up passcode & ${BIO_LABEL.startsWith('finger') ? 'biometrics' : BIO_LABEL}` : 'Set a passcode'} <span class="arr">→</span></button>
+    <button class="link sec-skip" data-action="sec-skip">Skip for now</button>`}
+  </section>`;
+}
+
+async function finishSecuritySetup() {
+  const L = lockCfg();
+  const wantBio = ui.bioAvail && ui.secBio;
+  let bioOk = false;
+  if (wantBio) { const b = await bioEnroll(); if (b) { L.bio = b; bioOk = true; } }
+  L.asked = true; save();
+  Object.assign(ui, { setup: null, fromSignup: false, flow: null, lockMode: null, pin: '', pinTemp: null, lockMsg: '', unlocked: true });
+  render(); scrollTo(0, 0);
+  toast(bioOk ? `All set 🔒 Next time, open ObaaSima with ${BIO_LABEL}`
+    : wantBio ? `${BIO_LABEL} wasn’t turned on — try again in Profile → App Lock`
+    : 'All set 🔒 Next time, ObaaSima will ask for your passcode');
+  maybeRemind();
+}
+
+document.addEventListener('click', e => {
+  const el = e.target.closest('[data-action^="sec-"]');
+  if (!el) return;
+  switch (el.dataset.action) {
+    case 'sec-bio': ui.secBio = el.checked; render(); break;
+    case 'sec-start':
+      Object.assign(ui, { flow: 'signup', lockMode: 'create', pin: '', pinTemp: null, lockMsg: '' });
+      render(); scrollTo(0, 0); break;
+    case 'sec-skip':
+      lockCfg().asked = true; save();
+      Object.assign(ui, { setup: null, fromSignup: false, unlocked: true });
+      render(); scrollTo(0, 0);
+      toast('You can turn on App Lock anytime in Profile');
+      maybeRemind();
+      break;
+  }
+});

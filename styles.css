@@ -522,3 +522,30 @@ input[type=text]::placeholder, input[type=number]::placeholder { color: var(--mu
 .ing-list em { color: var(--muted); font-style: normal; font-size: 13px; }
 .steps { margin: 0; padding-left: 22px; display: grid; gap: 10px; font-size: 15px; line-height: 1.5; }
 .safety { margin-top: 16px; padding: 12px 14px; border-radius: 14px; background: var(--rose-soft); font-size: 14px; }
+
+/* ---------- Signup step 2: Keep it private ---------- */
+.security { display: grid; gap: 14px; padding-top: 24px; }
+.security .sec-step { font-size: 12.5px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--plum-2); }
+@media (prefers-color-scheme: dark) { .security .sec-step { color: var(--rose); } }
+.security .sec-badge { width: 64px; height: 64px; border-radius: 20px; display: grid; place-items: center; background: linear-gradient(145deg, var(--plum-2), var(--plum)); color: #ffd9e6; box-shadow: 0 10px 24px -10px rgba(91, 31, 83, .6); }
+.security .sec-badge .bio-ic { width: 30px; height: 30px; }
+.security h1 { margin: 2px 0 0; }
+.security > p { color: var(--muted); }
+.sec-card { display: grid; gap: 10px; }
+.sec-card .bio-ic { width: 22px; height: 22px; }
+.sec-row { display: flex; gap: 12px; align-items: center; padding-top: 12px; border-top: 1px solid var(--border); }
+.sec-row > .bio-ic { color: var(--plum-2); flex: none; }
+.sec-row b { display: block; font-size: 15px; }
+.sec-skip { justify-self: center; font-size: 15px; }
+/* passcode pad, light version */
+.sec-pad { padding: 22px 12px; }
+.sec-pad .pin-title { color: var(--text); }
+.sec-pad .pin .dots i { border-color: var(--plum-2); }
+.sec-pad .pin .dots i.on { background: var(--plum-2); }
+.sec-pad .pin-msg { color: var(--muted); }
+.sec-pad .pin-msg.err { color: var(--rose); }
+.sec-pad .pin .key { background: var(--surface-2); border-color: var(--border); color: var(--text); backdrop-filter: none; -webkit-backdrop-filter: none; }
+.sec-pad .pin .key:active { background: var(--surface-3); }
+.sec-pad .pin .key.fn { background: transparent; color: var(--plum-2); }
+.sec-pad .link-light { color: var(--plum-2); }
+@media (prefers-color-scheme: dark) { .sec-pad .pin .dots i { border-color: var(--rose); } .sec-pad .pin .dots i.on { background: var(--rose); } .sec-pad .link-light, .sec-pad .pin .key.fn { color: var(--rose); } }

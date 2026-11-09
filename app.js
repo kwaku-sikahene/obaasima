@@ -130,7 +130,7 @@ const DEFAULTS = {
   settings: {
     name: '', photo: null, cycleLength: 28, periodLength: 5, lutealLength: 14,
     reminders: false, onboarded: false, lastNotified: null, pregnancy: { on: false, lmp: null },
-    lock: { on: false, salt: null, hash: null, bio: null, fails: 0, until: 0 },
+    lock: { on: false, salt: null, hash: null, bio: null, fails: 0, until: 0, asked: false },
   },
   days: {},
 };
@@ -175,7 +175,9 @@ function save() {
 let state = load();
 const ui = { tab: 'home', sub: null, month: startOfMonth(today()), edit: false, sheetDate: null, more: false, step: 0,
   // App lock (see lock.js): the welcome screen shows until she unlocks or continues.
-  unlocked: false, lockMode: null, pin: '', pinTemp: null, lockMsg: '', flow: null, shake: false };
+  unlocked: false, lockMode: null, pin: '', pinTemp: null, lockMsg: '', flow: null, shake: false,
+  // Signup step 2 ("Keep it private"): set up Face ID + passcode; the lock starts from the next open.
+  setup: null, secBio: true, fromSignup: false };
 
 function getDay(k) { return state.days[k] || {}; }
 function setDay(k, patch) {
@@ -302,9 +304,11 @@ const $ = sel => document.querySelector(sel);
 function render() {
   const view = $('#view');
   const onboarding = !state.settings.onboarded;
-  const locked = !onboarding && !ui.unlocked;
-  document.body.classList.toggle('bare', onboarding || locked);
+  const securing = !onboarding && typeof needsSecuritySetup === 'function' && needsSecuritySetup();
+  const locked = !onboarding && !securing && !ui.unlocked;
+  document.body.classList.toggle('bare', onboarding || locked || securing);
   if (onboarding) { view.innerHTML = ui.step === 0 ? renderSplash() : renderOnboarding(); return; }
+  if (securing) { view.innerHTML = renderSecurity(); ui.shake = false; return; }
   if (locked) { view.innerHTML = renderLock(); ui.shake = false; return; }
   const M = model();
   const views = { home: renderHome, calendar: renderCalendar, insights: renderInsights, profile: renderProfile };
@@ -342,6 +346,7 @@ function renderOnboarding() {
   return `
   <section class="onboard">
     <button class="icon-btn" data-action="welcome-back" aria-label="Back">${ICON.back}</button>
+    <p class="sec-step" style="font-size:12.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--plum-2);margin:6px 0 4px">Step 1 of 2</p>
     ${LOTUS}
     <h1>Akwaaba!</h1>
     <p>Welcome. Let’s get to know you — it only takes a minute, and it all stays on your phone.</p>
@@ -1108,8 +1113,9 @@ document.addEventListener('submit', e => {
     }
   }
   ui.tab = 'home';
-  // Next: protect the app with a passcode (and Face ID / Touch ID if available).
-  Object.assign(ui, { unlocked: false, flow: 'setup', lockMode: 'create', pin: '', lockMsg: '' });
+  // Step 2 of signup: "Keep it private" (Face ID + backup passcode). She goes straight in afterwards;
+  // the lock starts asking from the next time she opens ObaaSima.
+  Object.assign(ui, { unlocked: true, setup: 'security', fromSignup: true, flow: null, lockMode: null, pin: '', lockMsg: '' });
   save(); render(); scrollTo(0, 0);
   toast(`Akwaaba${state.settings.name ? ', ' + state.settings.name : ''} 🌸`);
 });
