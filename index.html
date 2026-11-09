@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#fcf1f4" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#1a0f18" media="(prefers-color-scheme: dark)">
+  <meta name="description" content="ObaaSima — know your body, embrace your journey. A private period and pregnancy companion.">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="ObaaSima">
+  <title>ObaaSima</title>
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icons/icon-180.png">
+  <link rel="preload" href="fonts/playfair-display.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <main id="view" aria-live="polite"></main>
+
+  <nav class="tabbar" aria-label="Sections">
+    <button data-tab="home" class="active">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 10.5 12 4l8 6.5V19a1.5 1.5 0 0 1-1.5 1.5H15v-5.5H9v5.5H5.5A1.5 1.5 0 0 1 4 19z"/></svg>
+      <span>Home</span>
+    </button>
+    <button data-tab="calendar">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="5.5" width="16" height="14.5" rx="3"/><path d="M4 10h16M8.5 3.5v4M15.5 3.5v4"/><circle cx="12" cy="15" r="1.2" class="fill"/></svg>
+      <span>Calendar</span>
+    </button>
+    <button class="plus" data-action="log-today" aria-label="Log today">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+    </button>
+    <button data-tab="insights">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20c-4-3-8-5.5-8-10a4 4 0 0 1 8-1 4 4 0 0 1 8 1c0 4.5-4 7-8 10z"/><path d="M7 12h2.5l1.5-2.5 2 5 1.5-2.5H17"/></svg>
+      <span>Insights</span>
+    </button>
+    <button data-tab="profile">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8.5" r="3.8"/><path d="M4.5 20c1.2-3.8 4-5.5 7.5-5.5s6.3 1.7 7.5 5.5"/></svg>
+      <span>Profile</span>
+    </button>
+  </nav>
+
+  <dialog id="sheet" aria-label="Log health"></dialog>
+  <div id="toast" role="status"></div>
+
+  <script src="app.js"></script>
+</body>
+</html>
